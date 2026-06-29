@@ -52,7 +52,7 @@ function SummaryBar({ products, onFilterClick }) {
           <div className="summary-icon" style={{ background: card.iconBg }}>{card.icon}</div>
           <span className="summary-label">{card.label}</span>
           <span className="summary-value" style={{ color: card.color }}>{card.value}</span>
-          {card.clickable && <span className="summary-card-hint">click to filter →</span>}
+          {/* {card.clickable && <span className="summary-card-hint">click to filter →</span>} */}
         </div>
       ))}
     </div>

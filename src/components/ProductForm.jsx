@@ -85,28 +85,37 @@ function ProductForm({ initialData, onSubmit, onCancel, categories = [] }) {
       e.quantity = 'Quantity cannot exceed 9,99,999.'
     }
 
-    // Price
-    if (data.price === '') {
-      e.price = 'Price is required.'
-    } else if (isNaN(Number(data.price)) || Number(data.price) < 0) {
-      e.price = 'Price must be a valid positive number.'
-    } else if (Number(data.price) > 9999999) {
-      e.price = 'Price cannot exceed ₹99,99,999.'
-    }
+  // Price
+if (data.price === '') {
+  e.price = 'Price is required.'
+} else if (!/^\d+(\.\d{1,2})?$/.test(String(data.price).trim())) {
+  e.price = 'Price must be a valid number — digits only, up to 2 decimal places.'
+} else if (Number(data.price) < 0) {
+  e.price = 'Price cannot be negative.'
+} else if (Number(data.price) > 9999999) {
+  e.price = 'Price cannot exceed ₹99,99,999.'
+}
 
     return e
   }
+function handleChange(e) {
+  const { name, value } = e.target
+  let sanitized = value
 
-  function handleChange(e) {
-    const { name, value } = e.target
-    const updated = { ...form, [name]: value }
-    setForm(updated)
-    if (touched[name]) {
-      const errs = validate(updated)
-      setErrors(prev => ({ ...prev, [name]: errs[name] }))
-    }
+  if (name === 'price') {
+    sanitized = value.replace(/[^0-9.]/g, '')
+    const parts = sanitized.split('.')
+    if (parts.length > 2) sanitized = parts[0] + '.' + parts.slice(1).join('')
+    if (parts[1]?.length > 2) sanitized = parts[0] + '.' + parts[1].slice(0, 2)
   }
 
+  const updated = { ...form, [name]: sanitized }
+  setForm(updated)
+  if (touched[name]) {
+    const errs = validate(updated)
+    setErrors(prev => ({ ...prev, [name]: errs[name] }))
+  }
+}
   function handleBlur(e) {
     const { name } = e.target
     setTouched(prev => ({ ...prev, [name]: true }))
@@ -269,27 +278,35 @@ function ProductForm({ initialData, onSubmit, onCancel, categories = [] }) {
           </Field>
 
           {/* Price */}
-          <Field label="Price (₹)" name="price" required errors={errors} touched={touched}>
-            <div style={{ position: 'relative' }}>
-              <span className="price-prefix">₹</span>
-              <input
-                name="price"
-                type="number"
-                placeholder="0.00"
-                value={form.price}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                className={`input-field ${errors.price && touched.price ? 'input-error' : ''}`}
-                style={{ paddingLeft: '26px' }}
-                min="0"
-                step="0.01"
-              />
-            </div>
-            {!errors.price && (
-              <p className="field-hint">In Indian Rupees · max ₹99,99,999</p>
-            )}
-          </Field>
-
+          {/* Price */}
+<Field label="Price (₹)" name="price" required errors={errors} touched={touched}>
+  <div style={{ position: 'relative' }}>
+    <span className="price-prefix">₹</span>
+    <input
+      name="price"
+      type="text"
+      inputMode="decimal"
+      placeholder="0.00"
+      value={form.price}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      onKeyDown={e => {
+        const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', '.']
+        if (!allowed.includes(e.key) && !/^\d$/.test(e.key)) {
+          e.preventDefault()
+        }
+        if (e.key === '.' && String(form.price).includes('.')) {
+          e.preventDefault()
+        }
+      }}
+      className={`input-field ${errors.price && touched.price ? 'input-error' : ''}`}
+      style={{ paddingLeft: '26px' }}
+    />
+  </div>
+  {!errors.price && (
+    <p className="field-hint">In Indian Rupees · max ₹99,99,999</p>
+  )}
+</Field>
         </div>
 
         {/* Description */}

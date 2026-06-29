@@ -143,7 +143,7 @@ function App() {
       <nav className="navbar">
         <div className="logo">
           <div className="logo-icon">📦</div>
-          <span className="logo-text">Invent<span className="logo-dot">.</span>ory</span>
+          <span className="logo-text">Inventory</span>
         </div>
 
         <div className="nav-tabs">
@@ -187,7 +187,7 @@ function App() {
         <div className="drawer-overlay" onClick={() => setMobileMenuOpen(false)}>
           <div className="drawer" onClick={e => e.stopPropagation()}>
             <div className="drawer-header">
-              <span className="logo-text">Invent<span className="logo-dot">.</span>ory</span>
+              <span className="logo-text">Inventory</span>
               <button className="btn-ghost" onClick={() => setMobileMenuOpen(false)}>✕</button>
             </div>
             {tabs.map(t => (

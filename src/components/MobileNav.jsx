@@ -3,9 +3,7 @@ function MobileNav({ activeTab, onTabChange, onClose, categories, onExport }) {
     <div className="mobile-overlay" onClick={onClose}>
       <div className="mobile-menu" onClick={e => e.stopPropagation()}>
         <div className="mobile-menu-header">
-          <span className="logo-text">
-            Invent<span className="logo-dot">.</span>ory
-          </span>
+          <span className="logo-text">Inventory</span>
           <button className="mobile-close-btn" onClick={onClose}>✕</button>
         </div>
         <nav className="mobile-menu-nav">
