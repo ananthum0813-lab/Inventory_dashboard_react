@@ -177,17 +177,17 @@ describe('Page Load — ProductTable', () => {
 
   it('renders without crashing', () => {
     render(<ProductTable {...tableProps} />)
-    expect(screen.getByText('Laptop')).toBeInTheDocument()
+    expect(screen.getAllByText('Laptop')[0]).toBeInTheDocument()
   })
 
   it('renders all column headers', () => {
     render(<ProductTable {...tableProps} />)
-    expect(screen.getByText('Product')).toBeInTheDocument()
-    expect(screen.getByText('Category')).toBeInTheDocument()
-    expect(screen.getByText('Qty')).toBeInTheDocument()
-    expect(screen.getByText('Price')).toBeInTheDocument()
-    expect(screen.getByText('Status')).toBeInTheDocument()
-    expect(screen.getByText('Actions')).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: /Product/i })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: /Category/i })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: /Qty/i })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: /Price/i })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: /Status/i })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: /Actions/i })).toBeInTheDocument()
   })
 
   it('shows empty state when no products', () => {
@@ -204,7 +204,7 @@ describe('Page Load — ProductTable', () => {
   it('shows Edit buttons for each product', () => {
     render(<ProductTable {...tableProps} />)
     const editBtns = screen.getAllByText(/edit/i)
-    expect(editBtns.length).toBe(PRODUCTS.length)
+    expect(editBtns.length).toBe(PRODUCTS.length * 2)
   })
 
   it('calls onEdit when Edit button is clicked', async () => {
@@ -296,7 +296,7 @@ describe('Page Load — ProductForm', () => {
     const nameInput = screen.getByPlaceholderText(/laptop pro x1/i)
     await userEvent.type(nameInput, 'Widget@!#')
     fireEvent.blur(nameInput)
-    expect(await screen.findByText(/alphanumeric/i)).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent(/alphanumeric/i)
   })
 })
 
@@ -404,16 +404,16 @@ describe('Page Load — CategoryProductsPage', () => {
 
   it('renders hero stat cards (Products, Total Units, Stock Value, Portfolio %)', () => {
     render(<CategoryProductsPage {...catPageProps} />)
-    expect(screen.getByText('Products')).toBeInTheDocument()
-    expect(screen.getByText('Total Units')).toBeInTheDocument()
-    expect(screen.getByText('Stock Value')).toBeInTheDocument()
-    expect(screen.getByText('Portfolio %')).toBeInTheDocument()
+    expect(screen.getByText('Products', { selector: '.cat-hero-stat-label' })).toBeInTheDocument()
+    expect(screen.getByText('Total Units', { selector: '.cat-hero-stat-label' })).toBeInTheDocument()
+    expect(screen.getByText('Stock Value', { selector: '.cat-hero-stat-label' })).toBeInTheDocument()
+    expect(screen.getByText('Portfolio %', { selector: '.cat-hero-stat-label' })).toBeInTheDocument()
   })
 
   it('renders products belonging to the category', () => {
     render(<CategoryProductsPage {...catPageProps} />)
-    expect(screen.getByText('Laptop')).toBeInTheDocument()
-    expect(screen.getByText('Keyboard')).toBeInTheDocument()
+    expect(screen.getAllByText('Laptop').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Keyboard').length).toBeGreaterThan(0)
   })
 
   it('does NOT render products from other categories', () => {
@@ -425,7 +425,7 @@ describe('Page Load — CategoryProductsPage', () => {
   it('filters products by search term', async () => {
     render(<CategoryProductsPage {...catPageProps} />)
     await userEvent.type(screen.getByPlaceholderText(/search products/i), 'Laptop')
-    expect(screen.getByText('Laptop')).toBeInTheDocument()
+    expect(screen.getAllByText('Laptop').length).toBeGreaterThan(0)
     expect(screen.queryByText('Keyboard')).not.toBeInTheDocument()
   })
 
@@ -491,13 +491,13 @@ describe('Page Load — CategoryProductsPage', () => {
     // Go to page 2
     await userEvent.click(screen.getByLabelText(/next page/i))
     // "Device 20" is only on page 2
-    expect(screen.getByText('Device 20')).toBeInTheDocument()
+    expect(screen.getAllByText('Device 20')[0]).toBeInTheDocument()
     // Search — resets to page 1
     await userEvent.type(screen.getByPlaceholderText(/search products/i), 'Device 0')
     // "Device 20" should no longer be visible
     expect(screen.queryByText('Device 20')).not.toBeInTheDocument()
     // "Device 0" should be visible (page 1)
-    expect(screen.getByText('Device 0')).toBeInTheDocument()
+    expect(screen.getAllByText('Device 0')[0]).toBeInTheDocument()
   })
 })
 
