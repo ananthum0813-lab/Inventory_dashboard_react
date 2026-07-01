@@ -12,7 +12,7 @@ import Toast from './components/Toast'
 const defaultFilters = { search: '', category: '', stockStatus: '', minQty: '', maxQty: '' }
 
 function App() {
-  const { products, addProduct, editProduct, deleteProduct } = useInventory()
+  const { products, addProduct, editProduct, deleteProduct, adjustStock } = useInventory()
   const { toasts, addToast, removeToast } = useToast()
   const [filters, setFilters] = useState(defaultFilters)
   const [editingProduct, setEditingProduct] = useState(null)
@@ -45,7 +45,6 @@ function App() {
       const matchMaxQty = filters.maxQty === '' || qty <= Number(filters.maxQty)
       return matchSearch && matchCategory && matchStock && matchMaxQty
     })
-
     list = [...list].sort((a, b) => {
       let aVal = a[sortKey]
       let bVal = b[sortKey]
@@ -129,6 +128,25 @@ function App() {
     setFilters(f => ({ ...f, stockStatus: f.stockStatus === stockStatus ? '' : stockStatus }))
   }
 
+  function handleAdjustStock(id, amount, type) {
+    const product = products.find(p => p.id === id)
+    if (!product) return
+    if (type === 'stock-out') {
+      const available = Number(product.quantity)
+      const actual = Math.min(amount, available)
+      // StockAdjustControl already blocks this, but guard here too
+      if (actual === 0) {
+        addToast(`"${product.name}" is already out of stock.`, 'warning')
+        return
+      }
+      adjustStock(id, amount, type)
+      addToast(`${actual} unit${actual !== 1 ? 's' : ''} removed from "${product.name}".`, 'success')
+    } else {
+      adjustStock(id, amount, type)
+      addToast(`${amount} unit${amount !== 1 ? 's' : ''} added to "${product.name}".`, 'success')
+    }
+  }
+
   const tabs = [
     { id: 'inventory', label: 'Inventory', icon: '🗂' },
     { id: 'categories', label: 'Categories', icon: '🏷', badge: categories.length },
@@ -136,7 +154,6 @@ function App() {
 
   return (
     <div className="app-shell">
-
       <Toast toasts={toasts} onRemove={removeToast} />
 
       {/* ── Navbar ── */}
@@ -145,7 +162,6 @@ function App() {
           <div className="logo-icon">📦</div>
           <span className="logo-text">Inventory</span>
         </div>
-
         <div className="nav-tabs">
           {tabs.map(t => (
             <button
@@ -159,7 +175,6 @@ function App() {
             </button>
           ))}
         </div>
-
         <div className="nav-right">
           <span className="product-count">{products.length} products</span>
           <div className="nav-divider" />
@@ -214,7 +229,6 @@ function App() {
 
       {/* ── Page content ── */}
       <main className="page-content">
-
         {activeTab === 'inventory' && (
           <>
             <div className="page-header">
@@ -269,6 +283,7 @@ function App() {
                 onSort={handleSort}
                 sortKey={sortKey}
                 sortDir={sortDir}
+                onAdjustStock={handleAdjustStock}
               />
             </div>
           </>
@@ -283,7 +298,6 @@ function App() {
             onDelete={handleDelete}
           />
         )}
-
       </main>
 
       {/* ── Mobile bottom bar ── */}
@@ -304,7 +318,6 @@ function App() {
           aria-label="Add product"
         >+</button>
       </div>
-
     </div>
   )
 }

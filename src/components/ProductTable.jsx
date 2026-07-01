@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { formatINR, formatINRDecimal } from '../utils/formatCurrency'
+import StockHistoryModal from './StockHistoryModal'
 
 const PAGE_SIZE = 10
 
@@ -9,9 +10,83 @@ function StockBadge({ quantity, threshold }) {
   return <span className="badge badge-instock">✅ In stock</span>
 }
 
-function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir }) {
+function StockAdjustControl({ product, onAdjustStock, onClose }) {
+  const [type, setType] = useState('stock-in')
+  const [amount, setAmount] = useState('')
+  const [submitError, setSubmitError] = useState('')
+
+  const currentQty = Number(product.quantity)
+  const numAmt = Number(amount)
+
+  // Inline validation
+  const inputInvalid = amount !== '' && (!/^\d+$/.test(amount) || numAmt <= 0)
+  const exceedsStock = type === 'stock-out' && amount !== '' && !inputInvalid && numAmt > currentQty
+
+  function handleTypeChange(t) {
+    setType(t)
+    setSubmitError('')
+  }
+
+  function handleConfirm() {
+    if (amount === '' || !/^\d+$/.test(amount) || numAmt <= 0) {
+      setSubmitError('Enter a valid positive number.')
+      return
+    }
+    if (type === 'stock-out' && numAmt > currentQty) {
+      setSubmitError(`Only ${currentQty} unit${currentQty !== 1 ? 's' : ''} available.`)
+      return
+    }
+    onAdjustStock(product.id, numAmt, type)
+    onClose()
+  }
+
+  return (
+    <div className="stock-adjust-wrap" onClick={e => e.stopPropagation()}>
+      <div className="stock-adjust-toggle">
+        <button
+          type="button"
+          className={`stock-adjust-type-btn ${type === 'stock-in' ? 'stock-adjust-type-active-in' : ''}`}
+          onClick={() => handleTypeChange('stock-in')}
+        >↑ In</button>
+        <button
+          type="button"
+          className={`stock-adjust-type-btn ${type === 'stock-out' ? 'stock-adjust-type-active-out' : ''}`}
+          onClick={() => handleTypeChange('stock-out')}
+        >↓ Out</button>
+      </div>
+
+      <div className="stock-adjust-input-wrap">
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="Amount"
+          value={amount}
+          onChange={e => { setAmount(e.target.value.replace(/[^\d]/g, '')); setSubmitError('') }}
+          className={`input-field stock-adjust-input ${(inputInvalid || exceedsStock || submitError) ? 'input-error' : ''}`}
+          autoFocus
+          onKeyDown={e => { if (e.key === 'Enter') handleConfirm(); if (e.key === 'Escape') onClose() }}
+        />
+        {exceedsStock && (
+          <div className="stock-adjust-hint stock-adjust-hint-error">
+            Max available: {currentQty}
+          </div>
+        )}
+        {submitError && !exceedsStock && (
+          <div className="stock-adjust-hint stock-adjust-hint-error">{submitError}</div>
+        )}
+      </div>
+
+      <button type="button" className="btn-confirm" onClick={handleConfirm} style={{ flexShrink: 0 }}>✓</button>
+      <button type="button" className="btn-ghost" onClick={onClose} style={{ flexShrink: 0 }}>✕</button>
+    </div>
+  )
+}
+
+function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir, onAdjustStock }) {
   const [confirmId, setConfirmId] = useState(null)
   const [page, setPage] = useState(1)
+  const [adjustingId, setAdjustingId] = useState(null)
+  const [historyProduct, setHistoryProduct] = useState(null)
 
   const totalPages = Math.max(1, Math.ceil(products.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -23,9 +98,7 @@ function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir }) 
     else { setConfirmId(id); setTimeout(() => setConfirmId(c => c === id ? null : c), 4000) }
   }
 
-  function goTo(p) {
-    setPage(Math.max(1, Math.min(p, totalPages)))
-  }
+  function goTo(p) { setPage(Math.max(1, Math.min(p, totalPages))) }
 
   function getPageNums() {
     const pages = []
@@ -60,6 +133,10 @@ function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir }) 
 
   return (
     <>
+      {historyProduct && (
+        <StockHistoryModal product={historyProduct} onClose={() => setHistoryProduct(null)} />
+      )}
+
       {/* Desktop table */}
       <div className="desktop-table">
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -89,21 +166,36 @@ function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir }) 
                 <td className="table-td">
                   <span className="badge badge-category">{p.category}</span>
                 </td>
-                <td className="table-td">
-                  <span className="qty-value">{Number(p.quantity).toLocaleString('en-IN')}</span>
+                <td className="table-td" style={{ minWidth: '140px' }}>
+                  {adjustingId === p.id ? (
+                    <StockAdjustControl
+                      product={p}
+                      onAdjustStock={onAdjustStock}
+                      onClose={() => setAdjustingId(null)}
+                    />
+                  ) : (
+                    <div className="qty-cell">
+                      <span className="qty-value">{Number(p.quantity).toLocaleString('en-IN')}</span>
+                      <button
+                        type="button"
+                        className="qty-adjust-trigger"
+                        onClick={() => { setConfirmId(null); setAdjustingId(p.id) }}
+                        title="Adjust stock"
+                      >⇅</button>
+                    </div>
+                  )}
                 </td>
                 <td className="table-td">
                   <span className="price-value">{formatINRDecimal(p.price)}</span>
-                  <div className="stock-value">
-                    val: {formatINR(Number(p.price) * Number(p.quantity))}
-                  </div>
+                  <div className="stock-value">val: {formatINR(Number(p.price) * Number(p.quantity))}</div>
                 </td>
                 <td className="table-td">
                   <StockBadge quantity={Number(p.quantity)} threshold={Number(p.lowStockThreshold)} />
                 </td>
                 <td className="table-td">
                   <div className="action-btns">
-                    <button className="btn-edit" onClick={() => { setConfirmId(null); onEdit(p) }}>✏️ Edit</button>
+                    <button className="btn-edit" onClick={() => { setConfirmId(null); setAdjustingId(null); onEdit(p) }}>✏️ Edit</button>
+                    <button className="btn-history" onClick={() => setHistoryProduct(p)} title="Stock history">🕓</button>
                     {confirmId === p.id ? (
                       <>
                         <button className="btn-confirm" onClick={() => handleDelete(p.id)}>Confirm</button>
@@ -131,7 +223,9 @@ function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir }) 
               </div>
               <StockBadge quantity={Number(p.quantity)} threshold={Number(p.lowStockThreshold)} />
             </div>
+
             {p.description && <p className="product-card-desc">{p.description}</p>}
+
             <div className="product-card-stats">
               <div className="product-card-stat">
                 <span className="stat-label">Qty</span>
@@ -148,8 +242,27 @@ function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir }) 
                 </span>
               </div>
             </div>
+
+            {adjustingId === p.id ? (
+              <StockAdjustControl
+                product={p}
+                onAdjustStock={onAdjustStock}
+                onClose={() => setAdjustingId(null)}
+              />
+            ) : (
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ fontSize: '13px', padding: '8px 14px', width: '100%', justifyContent: 'center', display: 'flex', gap: '6px' }}
+                onClick={() => setAdjustingId(p.id)}
+              >
+                ⇅ Adjust Stock
+              </button>
+            )}
+
             <div className="product-card-actions">
-              <button className="btn-edit" style={{ flex: 1 }} onClick={() => { setConfirmId(null); onEdit(p) }}>✏️ Edit</button>
+              <button className="btn-edit" style={{ flex: 1 }} onClick={() => { setConfirmId(null); setAdjustingId(null); onEdit(p) }}>✏️ Edit</button>
+              <button className="btn-history" onClick={() => setHistoryProduct(p)} title="Stock history">🕓</button>
               {confirmId === p.id ? (
                 <>
                   <button className="btn-confirm" style={{ flex: 1 }} onClick={() => handleDelete(p.id)}>Confirm delete</button>
@@ -171,31 +284,14 @@ function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir }) 
               {start + 1}–{Math.min(start + PAGE_SIZE, products.length)} of {products.length.toLocaleString('en-IN')}
             </span>
           </div>
-
           <div className="pagination-right">
-            <button
-              className="page-btn"
-              onClick={() => goTo(safePage - 1)}
-              disabled={safePage === 1}
-              aria-label="Previous page"
-            >←</button>
-
+            <button className="page-btn" onClick={() => goTo(safePage - 1)} disabled={safePage === 1} aria-label="Previous page">←</button>
             {getPageNums().map((p, i) =>
               p === '...'
                 ? <span key={`ellipsis-${i}`} className="page-ellipsis">…</span>
-                : <button
-                    key={p}
-                    className={`page-btn ${p === safePage ? 'page-btn-active' : ''}`}
-                    onClick={() => goTo(p)}
-                  >{p}</button>
+                : <button key={p} className={`page-btn ${p === safePage ? 'page-btn-active' : ''}`} onClick={() => goTo(p)}>{p}</button>
             )}
-
-            <button
-              className="page-btn"
-              onClick={() => goTo(safePage + 1)}
-              disabled={safePage === totalPages}
-              aria-label="Next page"
-            >→</button>
+            <button className="page-btn" onClick={() => goTo(safePage + 1)} disabled={safePage === totalPages} aria-label="Next page">→</button>
           </div>
         </div>
       )}
