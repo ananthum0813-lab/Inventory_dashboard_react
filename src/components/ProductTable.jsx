@@ -11,21 +11,16 @@ function StockBadge({ quantity, threshold }) {
 }
 
 function StockAdjustControl({ product, onAdjustStock, onClose }) {
-  const [type, setType] = useState('stock-in')
-  const [amount, setAmount] = useState('')
+  const [type, setType]         = useState('stock-in')
+  const [amount, setAmount]     = useState('')
   const [submitError, setSubmitError] = useState('')
 
-  const currentQty = Number(product.quantity)
-  const numAmt = Number(amount)
-
-  // Inline validation
+  const currentQty  = Number(product.quantity)
+  const numAmt      = Number(amount)
   const inputInvalid = amount !== '' && (!/^\d+$/.test(amount) || numAmt <= 0)
   const exceedsStock = type === 'stock-out' && amount !== '' && !inputInvalid && numAmt > currentQty
 
-  function handleTypeChange(t) {
-    setType(t)
-    setSubmitError('')
-  }
+  function handleTypeChange(t) { setType(t); setSubmitError('') }
 
   function handleConfirm() {
     if (amount === '' || !/^\d+$/.test(amount) || numAmt <= 0) {
@@ -43,55 +38,80 @@ function StockAdjustControl({ product, onAdjustStock, onClose }) {
   return (
     <div className="stock-adjust-wrap" onClick={e => e.stopPropagation()}>
       <div className="stock-adjust-toggle">
-        <button
-          type="button"
+        <button type="button"
           className={`stock-adjust-type-btn ${type === 'stock-in' ? 'stock-adjust-type-active-in' : ''}`}
-          onClick={() => handleTypeChange('stock-in')}
-        >↑ In</button>
-        <button
-          type="button"
+          onClick={() => handleTypeChange('stock-in')}>↑ In</button>
+        <button type="button"
           className={`stock-adjust-type-btn ${type === 'stock-out' ? 'stock-adjust-type-active-out' : ''}`}
-          onClick={() => handleTypeChange('stock-out')}
-        >↓ Out</button>
+          onClick={() => handleTypeChange('stock-out')}>↓ Out</button>
       </div>
-
       <div className="stock-adjust-input-wrap">
         <input
-          type="text"
-          inputMode="numeric"
-          placeholder="Amount"
-          value={amount}
+          type="text" inputMode="numeric" placeholder="Amount" value={amount}
           onChange={e => { setAmount(e.target.value.replace(/[^\d]/g, '')); setSubmitError('') }}
           className={`input-field stock-adjust-input ${(inputInvalid || exceedsStock || submitError) ? 'input-error' : ''}`}
           autoFocus
           onKeyDown={e => { if (e.key === 'Enter') handleConfirm(); if (e.key === 'Escape') onClose() }}
         />
-        {exceedsStock && (
-          <div className="stock-adjust-hint stock-adjust-hint-error">
-            Max available: {currentQty}
-          </div>
-        )}
-        {submitError && !exceedsStock && (
-          <div className="stock-adjust-hint stock-adjust-hint-error">{submitError}</div>
-        )}
+        {exceedsStock && <div className="stock-adjust-hint stock-adjust-hint-error">Max available: {currentQty}</div>}
+        {submitError && !exceedsStock && <div className="stock-adjust-hint stock-adjust-hint-error">{submitError}</div>}
       </div>
-
       <button type="button" className="btn-confirm" onClick={handleConfirm} style={{ flexShrink: 0 }}>✓</button>
       <button type="button" className="btn-ghost" onClick={onClose} style={{ flexShrink: 0 }}>✕</button>
     </div>
   )
 }
 
-function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir, onAdjustStock }) {
-  const [confirmId, setConfirmId] = useState(null)
-  const [page, setPage] = useState(1)
-  const [adjustingId, setAdjustingId] = useState(null)
+function ProductTable({
+  products, onEdit, onDelete, onSort, sortKey, sortDir,
+  onAdjustStock, categories = [],
+  onBulkDelete, onBulkUpdateCategory,
+}) {
+  const [confirmId, setConfirmId]       = useState(null)
+  const [page, setPage]                 = useState(1)
+  const [adjustingId, setAdjustingId]   = useState(null)
   const [historyProduct, setHistoryProduct] = useState(null)
+  const [selectedIds, setSelectedIds]   = useState(new Set())
+  const [bulkCategory, setBulkCategory] = useState('')
 
   const totalPages = Math.max(1, Math.ceil(products.length / PAGE_SIZE))
-  const safePage = Math.min(page, totalPages)
-  const start = (safePage - 1) * PAGE_SIZE
-  const paginated = products.slice(start, start + PAGE_SIZE)
+  const safePage   = Math.min(page, totalPages)
+  const start      = (safePage - 1) * PAGE_SIZE
+  const paginated  = products.slice(start, start + PAGE_SIZE)
+  const pageIds    = paginated.map(p => p.id)
+  const allPageSelected  = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id))
+  const somePageSelected = pageIds.some(id => selectedIds.has(id))
+
+  function toggleSelectAll() {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (allPageSelected) pageIds.forEach(id => next.delete(id))
+      else pageIds.forEach(id => next.add(id))
+      return next
+    })
+  }
+
+  function toggleSelect(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function clearSelection() { setSelectedIds(new Set()); setBulkCategory('') }
+
+  function handleBulkDelete() {
+    if (!onBulkDelete) return
+    onBulkDelete([...selectedIds])
+    clearSelection()
+  }
+
+  function handleBulkCategory() {
+    if (!onBulkUpdateCategory || !bulkCategory) return
+    onBulkUpdateCategory([...selectedIds], bulkCategory)
+    clearSelection()
+  }
 
   function handleDelete(id) {
     if (confirmId === id) { onDelete(id); setConfirmId(null) }
@@ -103,16 +123,14 @@ function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir, on
   function getPageNums() {
     const pages = []
     for (let i = 1; i <= totalPages; i++) {
-      if (i === 1 || i === totalPages || (i >= safePage - 1 && i <= safePage + 1)) {
-        pages.push(i)
-      } else if (pages[pages.length - 1] !== '...') {
-        pages.push('...')
-      }
+      if (i === 1 || i === totalPages || (i >= safePage - 1 && i <= safePage + 1)) pages.push(i)
+      else if (pages[pages.length - 1] !== '...') pages.push('...')
     }
     return pages
   }
 
   const columns = [
+    { key: 'select',   label: '', noSort: true },
     { key: 'name',     label: 'Product' },
     { key: 'category', label: 'Category' },
     { key: 'quantity', label: 'Qty' },
@@ -137,6 +155,35 @@ function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir, on
         <StockHistoryModal product={historyProduct} onClose={() => setHistoryProduct(null)} />
       )}
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="bulk-bar">
+          <span className="bulk-bar-count">{selectedIds.size} selected</span>
+          <div className="bulk-bar-actions">
+            <select
+              className="input-field bulk-cat-select"
+              value={bulkCategory}
+              onChange={e => setBulkCategory(e.target.value)}
+            >
+              <option value="">Move to category…</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <button
+              className="btn-secondary"
+              style={{ fontSize: '13px', padding: '7px 14px', whiteSpace: 'nowrap' }}
+              onClick={handleBulkCategory}
+              disabled={!bulkCategory}
+            >Apply</button>
+            <button
+              className="btn-danger"
+              style={{ fontSize: '13px', padding: '7px 14px', whiteSpace: 'nowrap' }}
+              onClick={handleBulkDelete}
+            >🗑 Delete all</button>
+            <button className="btn-ghost" onClick={clearSelection}>✕ Clear</button>
+          </div>
+        </div>
+      )}
+
       {/* Desktop table */}
       <div className="desktop-table">
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -147,10 +194,24 @@ function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir, on
                   key={col.key}
                   className={`table-th ${!col.noSort ? 'table-th-sortable' : ''}`}
                   onClick={() => !col.noSort && onSort(col.key)}
+                  style={col.key === 'select' ? { width: '40px', padding: '13px 8px 13px 18px' } : {}}
                 >
-                  {col.label}
-                  {!col.noSort && sortKey === col.key && (
-                    <span className="sort-indicator">{sortDir === 'asc' ? ' ↑' : ' ↓'}</span>
+                  {col.key === 'select' ? (
+                    <input
+                      type="checkbox"
+                      className="row-checkbox"
+                      checked={allPageSelected}
+                      ref={el => { if (el) el.indeterminate = somePageSelected && !allPageSelected }}
+                      onChange={toggleSelectAll}
+                      aria-label="Select all on page"
+                    />
+                  ) : (
+                    <>
+                      {col.label}
+                      {!col.noSort && sortKey === col.key && (
+                        <span className="sort-indicator">{sortDir === 'asc' ? ' ↑' : ' ↓'}</span>
+                      )}
+                    </>
                   )}
                 </th>
               ))}
@@ -158,7 +219,16 @@ function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir, on
           </thead>
           <tbody>
             {paginated.map(p => (
-              <tr key={p.id} className="table-row">
+              <tr key={p.id} className={`table-row ${selectedIds.has(p.id) ? 'table-row-selected' : ''}`}>
+                <td className="table-td" style={{ padding: '15px 8px 15px 18px', width: '40px' }}>
+                  <input
+                    type="checkbox"
+                    className="row-checkbox"
+                    checked={selectedIds.has(p.id)}
+                    onChange={() => toggleSelect(p.id)}
+                    aria-label={`Select ${p.name}`}
+                  />
+                </td>
                 <td className="table-td">
                   <div className="product-name">{p.name}</div>
                   {p.description && <div className="product-desc">{p.description}</div>}
@@ -166,22 +236,18 @@ function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir, on
                 <td className="table-td">
                   <span className="badge badge-category">{p.category}</span>
                 </td>
-                <td className="table-td" style={{ minWidth: '140px' }}>
+                <td className="table-td" style={{ minWidth: '150px' }}>
                   {adjustingId === p.id ? (
                     <StockAdjustControl
-                      product={p}
-                      onAdjustStock={onAdjustStock}
+                      product={p} onAdjustStock={onAdjustStock}
                       onClose={() => setAdjustingId(null)}
                     />
                   ) : (
                     <div className="qty-cell">
                       <span className="qty-value">{Number(p.quantity).toLocaleString('en-IN')}</span>
-                      <button
-                        type="button"
-                        className="qty-adjust-trigger"
+                      <button type="button" className="qty-adjust-trigger"
                         onClick={() => { setConfirmId(null); setAdjustingId(p.id) }}
-                        title="Adjust stock"
-                      >⇅</button>
+                        title="Adjust stock">⇅</button>
                     </div>
                   )}
                 </td>
@@ -194,8 +260,10 @@ function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir, on
                 </td>
                 <td className="table-td">
                   <div className="action-btns">
-                    <button className="btn-edit" onClick={() => { setConfirmId(null); setAdjustingId(null); onEdit(p) }}>✏️ Edit</button>
-                    <button className="btn-history" onClick={() => setHistoryProduct(p)} title="Stock history">🕓</button>
+                    <button className="btn-edit"
+                      onClick={() => { setConfirmId(null); setAdjustingId(null); onEdit(p) }}>✏️ Edit</button>
+                    <button className="btn-history"
+                      onClick={() => setHistoryProduct(p)} title="Stock history">🕓</button>
                     {confirmId === p.id ? (
                       <>
                         <button className="btn-confirm" onClick={() => handleDelete(p.id)}>Confirm</button>
@@ -215,17 +283,22 @@ function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir, on
       {/* Mobile cards */}
       <div className="mobile-cards">
         {paginated.map(p => (
-          <div key={p.id} className="product-card">
+          <div key={p.id} className={`product-card ${selectedIds.has(p.id) ? 'product-card-selected' : ''}`}>
             <div className="product-card-top">
+              <input
+                type="checkbox"
+                className="row-checkbox"
+                style={{ flexShrink: 0, marginTop: '2px' }}
+                checked={selectedIds.has(p.id)}
+                onChange={() => toggleSelect(p.id)}
+              />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="product-card-name">{p.name}</div>
                 <span className="badge badge-category">{p.category}</span>
               </div>
               <StockBadge quantity={Number(p.quantity)} threshold={Number(p.lowStockThreshold)} />
             </div>
-
             {p.description && <p className="product-card-desc">{p.description}</p>}
-
             <div className="product-card-stats">
               <div className="product-card-stat">
                 <span className="stat-label">Qty</span>
@@ -242,26 +315,19 @@ function ProductTable({ products, onEdit, onDelete, onSort, sortKey, sortDir, on
                 </span>
               </div>
             </div>
-
             {adjustingId === p.id ? (
-              <StockAdjustControl
-                product={p}
-                onAdjustStock={onAdjustStock}
-                onClose={() => setAdjustingId(null)}
-              />
+              <StockAdjustControl product={p} onAdjustStock={onAdjustStock}
+                onClose={() => setAdjustingId(null)} />
             ) : (
-              <button
-                type="button"
-                className="btn-secondary"
+              <button type="button" className="btn-secondary"
                 style={{ fontSize: '13px', padding: '8px 14px', width: '100%', justifyContent: 'center', display: 'flex', gap: '6px' }}
-                onClick={() => setAdjustingId(p.id)}
-              >
+                onClick={() => setAdjustingId(p.id)}>
                 ⇅ Adjust Stock
               </button>
             )}
-
             <div className="product-card-actions">
-              <button className="btn-edit" style={{ flex: 1 }} onClick={() => { setConfirmId(null); setAdjustingId(null); onEdit(p) }}>✏️ Edit</button>
+              <button className="btn-edit" style={{ flex: 1 }}
+                onClick={() => { setConfirmId(null); setAdjustingId(null); onEdit(p) }}>✏️ Edit</button>
               <button className="btn-history" onClick={() => setHistoryProduct(p)} title="Stock history">🕓</button>
               {confirmId === p.id ? (
                 <>

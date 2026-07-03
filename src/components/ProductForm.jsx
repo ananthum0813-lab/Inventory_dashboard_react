@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 
-const empty = { name: '', category: '', quantity: '', price: '', description: '' }
+const empty = { name: '', category: '', quantity: '', price: '', lowStockThreshold: '10', description: '' }
 
 function Field({ label, name, required, hint, errors, touched, children }) {
   return (
@@ -19,21 +19,22 @@ function Field({ label, name, required, hint, errors, touched, children }) {
 }
 
 function ProductForm({ initialData, onSubmit, onCancel, categories = [] }) {
-  const [form, setForm] = useState(empty)
-  const [errors, setErrors] = useState({})
+  const [form, setForm]       = useState(empty)
+  const [errors, setErrors]   = useState({})
   const [touched, setTouched] = useState({})
   const [catOpen, setCatOpen] = useState(false)
-  const catRef = useRef(null)
+  const catRef  = useRef(null)
   const nameRef = useRef(null)
 
   useEffect(() => {
     if (initialData) {
       setForm({
-        name: initialData.name || '',
-        category: initialData.category || '',
-        quantity: String(initialData.quantity ?? ''),
-        price: String(initialData.price ?? ''),
-        description: initialData.description || '',
+        name:              initialData.name              || '',
+        category:          initialData.category          || '',
+        quantity:          String(initialData.quantity   ?? ''),
+        price:             String(initialData.price      ?? ''),
+        lowStockThreshold: String(initialData.lowStockThreshold ?? 10),
+        description:       initialData.description       || '',
       })
     } else {
       setForm(empty)
@@ -54,7 +55,6 @@ function ProductForm({ initialData, onSubmit, onCancel, categories = [] }) {
   function validate(data = form) {
     const e = {}
 
-    // Name
     if (!data.name.trim()) {
       e.name = 'Product name is required.'
     } else if (data.name.trim().length < 2) {
@@ -62,60 +62,69 @@ function ProductForm({ initialData, onSubmit, onCancel, categories = [] }) {
     } else if (data.name.trim().length > 100) {
       e.name = 'Name cannot exceed 100 characters.'
     } else if (!/^[a-zA-Z0-9 ]+$/.test(data.name.trim())) {
-      e.name = 'Name must be alphanumeric — letters, numbers and spaces only. No special characters.'
+      e.name = 'Name must be alphanumeric — letters, numbers and spaces only.'
     }
 
-    // Category
     if (!data.category.trim()) {
       e.category = 'Category is required.'
     } else if (data.category.trim().length > 100) {
       e.category = 'Category cannot exceed 100 characters.'
     } else if (!/^[a-zA-Z0-9 ]+$/.test(data.category.trim())) {
-      e.category = 'Category must be alphanumeric — letters, numbers and spaces only. No special characters.'
+      e.category = 'Category must be alphanumeric — letters, numbers and spaces only.'
     }
 
-    // Quantity
     if (data.quantity === '') {
       e.quantity = 'Quantity is required.'
     } else if (!/^\d+$/.test(data.quantity.trim())) {
-      e.quantity = 'Quantity must be a whole number — no decimals or special characters.'
+      e.quantity = 'Quantity must be a whole number.'
     } else if (parseInt(data.quantity, 10) < 0) {
       e.quantity = 'Quantity cannot be negative.'
     } else if (parseInt(data.quantity, 10) > 999999) {
       e.quantity = 'Quantity cannot exceed 9,99,999.'
     }
 
-  // Price
-if (data.price === '') {
-  e.price = 'Price is required.'
-} else if (!/^\d+(\.\d{1,2})?$/.test(String(data.price).trim())) {
-  e.price = 'Price must be a valid number — digits only, up to 2 decimal places.'
-} else if (Number(data.price) < 0) {
-  e.price = 'Price cannot be negative.'
-} else if (Number(data.price) > 9999999) {
-  e.price = 'Price cannot exceed ₹99,99,999.'
-}
+    if (data.price === '') {
+      e.price = 'Price is required.'
+    } else if (!/^\d+(\.\d{1,2})?$/.test(String(data.price).trim())) {
+      e.price = 'Price must be a valid number — up to 2 decimal places.'
+    } else if (Number(data.price) < 0) {
+      e.price = 'Price cannot be negative.'
+    } else if (Number(data.price) > 9999999) {
+      e.price = 'Price cannot exceed ₹99,99,999.'
+    }
+
+    if (data.lowStockThreshold === '') {
+      e.lowStockThreshold = 'Low stock threshold is required.'
+    } else if (!/^\d+$/.test(String(data.lowStockThreshold).trim())) {
+      e.lowStockThreshold = 'Threshold must be a whole number.'
+    } else if (parseInt(data.lowStockThreshold, 10) < 1) {
+      e.lowStockThreshold = 'Threshold must be at least 1.'
+    } else if (parseInt(data.lowStockThreshold, 10) > 999999) {
+      e.lowStockThreshold = 'Threshold cannot exceed 9,99,999.'
+    }
 
     return e
   }
-function handleChange(e) {
-  const { name, value } = e.target
-  let sanitized = value
 
-  if (name === 'price') {
-    sanitized = value.replace(/[^0-9.]/g, '')
-    const parts = sanitized.split('.')
-    if (parts.length > 2) sanitized = parts[0] + '.' + parts.slice(1).join('')
-    if (parts[1]?.length > 2) sanitized = parts[0] + '.' + parts[1].slice(0, 2)
+  function handleChange(e) {
+    const { name, value } = e.target
+    let sanitized = value
+
+    if (name === 'price') {
+      sanitized = value.replace(/[^0-9.]/g, '')
+      const parts = sanitized.split('.')
+      if (parts.length > 2) sanitized = parts[0] + '.' + parts.slice(1).join('')
+      if (parts[1]?.length > 2) sanitized = parts[0] + '.' + parts[1].slice(0, 2)
+    }
+
+    const updated = { ...form, [name]: sanitized }
+    setForm(updated)
+    if (touched[name]) {
+      const errs = validate(updated)
+      setErrors(prev => ({ ...prev, [name]: errs[name] }))
+    }
   }
 
-  const updated = { ...form, [name]: sanitized }
-  setForm(updated)
-  if (touched[name]) {
-    const errs = validate(updated)
-    setErrors(prev => ({ ...prev, [name]: errs[name] }))
-  }
-}
   function handleBlur(e) {
     const { name } = e.target
     setTouched(prev => ({ ...prev, [name]: true }))
@@ -140,6 +149,16 @@ function handleChange(e) {
     setErrors(prev => ({ ...prev, quantity: errs.quantity }))
   }
 
+  function handleThresholdStep(delta) {
+    const current = parseInt(form.lowStockThreshold) || 1
+    const next = Math.max(1, current + delta)
+    const updated = { ...form, lowStockThreshold: String(next) }
+    setForm(updated)
+    setTouched(prev => ({ ...prev, lowStockThreshold: true }))
+    const errs = validate(updated)
+    setErrors(prev => ({ ...prev, lowStockThreshold: errs.lowStockThreshold }))
+  }
+
   function handleSubmit(e) {
     e.preventDefault()
     const allTouched = Object.fromEntries(Object.keys(form).map(k => [k, true]))
@@ -147,12 +166,12 @@ function handleChange(e) {
     const errs = validate()
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
     onSubmit({
-      name: form.name.trim(),
-      category: form.category.trim(),
-      quantity: parseInt(form.quantity, 10),
-      price: parseFloat(Number(form.price).toFixed(2)),
-      lowStockThreshold: 10,
-      description: form.description.trim(),
+      name:              form.name.trim(),
+      category:          form.category.trim(),
+      quantity:          parseInt(form.quantity, 10),
+      price:             parseFloat(Number(form.price).toFixed(2)),
+      lowStockThreshold: parseInt(form.lowStockThreshold, 10),
+      description:       form.description.trim(),
     })
     setForm(empty)
     setErrors({})
@@ -186,9 +205,7 @@ function handleChange(e) {
               className={`input-field ${errors.name && touched.name ? 'input-error' : ''}`}
               maxLength={100}
             />
-            {!errors.name && (
-              <p className="field-hint">Alphanumeric only · max 100 characters</p>
-            )}
+            {!errors.name && <p className="field-hint">Alphanumeric only · max 100 characters</p>}
           </Field>
 
           {/* Category */}
@@ -239,17 +256,14 @@ function handleChange(e) {
                 </div>
               )}
             </div>
-            {!errors.category && (
-              <p className="field-hint">Alphanumeric only · max 100 characters</p>
-            )}
+            {!errors.category && <p className="field-hint">Alphanumeric only · max 100 characters</p>}
           </Field>
 
           {/* Quantity */}
           <Field label="Quantity" name="quantity" required errors={errors} touched={touched}>
             <div className="qty-input-wrap">
               <button
-                type="button"
-                className="qty-btn"
+                type="button" className="qty-btn"
                 onClick={() => handleQtyStep(-1)}
                 disabled={(parseInt(form.quantity) || 0) <= 0}
                 aria-label="Decrease"
@@ -265,48 +279,60 @@ function handleChange(e) {
                 onBlur={handleBlur}
                 className={`input-field qty-input ${errors.quantity && touched.quantity ? 'input-error' : ''}`}
               />
-              <button
-                type="button"
-                className="qty-btn"
-                onClick={() => handleQtyStep(1)}
-                aria-label="Increase"
-              >+</button>
+              <button type="button" className="qty-btn" onClick={() => handleQtyStep(1)} aria-label="Increase">+</button>
             </div>
-            {!errors.quantity && (
-              <p className="field-hint">Whole numbers only · max 9,99,999</p>
-            )}
+            {!errors.quantity && <p className="field-hint">Whole numbers only · max 9,99,999</p>}
           </Field>
 
           {/* Price */}
-          {/* Price */}
-<Field label="Price (₹)" name="price" required errors={errors} touched={touched}>
-  <div style={{ position: 'relative' }}>
-    <span className="price-prefix">₹</span>
-    <input
-      name="price"
-      type="text"
-      inputMode="decimal"
-      placeholder="0.00"
-      value={form.price}
-      onChange={handleChange}
-      onBlur={handleBlur}
-      onKeyDown={e => {
-        const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', '.']
-        if (!allowed.includes(e.key) && !/^\d$/.test(e.key)) {
-          e.preventDefault()
-        }
-        if (e.key === '.' && String(form.price).includes('.')) {
-          e.preventDefault()
-        }
-      }}
-      className={`input-field ${errors.price && touched.price ? 'input-error' : ''}`}
-      style={{ paddingLeft: '26px' }}
-    />
-  </div>
-  {!errors.price && (
-    <p className="field-hint">In Indian Rupees · max ₹99,99,999</p>
-  )}
-</Field>
+          <Field label="Price (₹)" name="price" required errors={errors} touched={touched}>
+            <div style={{ position: 'relative' }}>
+              <span className="price-prefix">₹</span>
+              <input
+                name="price"
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={form.price}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                onKeyDown={e => {
+                  const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', '.']
+                  if (!allowed.includes(e.key) && !/^\d$/.test(e.key)) e.preventDefault()
+                  if (e.key === '.' && String(form.price).includes('.')) e.preventDefault()
+                }}
+                className={`input-field ${errors.price && touched.price ? 'input-error' : ''}`}
+                style={{ paddingLeft: '26px' }}
+              />
+            </div>
+            {!errors.price && <p className="field-hint">In Indian Rupees · max ₹99,99,999</p>}
+          </Field>
+
+          {/* Low Stock Threshold */}
+          <Field label="Low Stock Threshold" name="lowStockThreshold" required errors={errors} touched={touched}>
+            <div className="qty-input-wrap">
+              <button
+                type="button" className="qty-btn"
+                onClick={() => handleThresholdStep(-1)}
+                disabled={(parseInt(form.lowStockThreshold) || 1) <= 1}
+                aria-label="Decrease threshold"
+              >−</button>
+              <input
+                name="lowStockThreshold"
+                type="text"
+                inputMode="numeric"
+                pattern="\d*"
+                placeholder="10"
+                value={form.lowStockThreshold}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                className={`input-field qty-input ${errors.lowStockThreshold && touched.lowStockThreshold ? 'input-error' : ''}`}
+              />
+              <button type="button" className="qty-btn" onClick={() => handleThresholdStep(1)} aria-label="Increase threshold">+</button>
+            </div>
+            {!errors.lowStockThreshold && <p className="field-hint">Alert when qty falls at or below this</p>}
+          </Field>
+
         </div>
 
         {/* Description */}
