@@ -16,7 +16,7 @@ const defaultFilters = { search: '', category: '', stockStatus: '', minQty: '', 
 function App() {
   const {
     products, addProduct, editProduct, deleteProduct,
-    adjustStock, bulkUpdateCategory, bulkDelete,
+    adjustStock, bulkUpdateCategory, bulkUpdatePrice, bulkAdjustStock, bulkDelete,
   } = useInventory()
   const { toasts, addToast, removeToast } = useToast()
 
@@ -153,6 +153,19 @@ function App() {
     const count = ids.length
     bulkUpdateCategory(ids, newCategory)
     addToast(`${count} product${count !== 1 ? 's' : ''} moved to "${newCategory}".`, 'success')
+  }
+
+  function handleBulkUpdatePrice(ids, newPrice) {
+    const count = ids.length
+    bulkUpdatePrice(ids, newPrice)
+    addToast(`Price updated to ₹${Number(newPrice).toLocaleString('en-IN')} for ${count} product${count !== 1 ? 's' : ''}.`, 'success')
+  }
+
+  function handleBulkAdjustStock(ids, amount, type) {
+    const count = ids.length
+    bulkAdjustStock(ids, amount, type)
+    const verb = type === 'set' ? `set to ${amount}` : type === 'stock-in' ? `+${amount}` : `-${amount}`
+    addToast(`Stock ${verb} applied to ${count} product${count !== 1 ? 's' : ''}.`, 'success')
   }
 
   function handleFilterClick(stockStatus) {
@@ -301,6 +314,8 @@ function App() {
                 categories={categories}
                 onBulkDelete={handleBulkDelete}
                 onBulkUpdateCategory={handleBulkUpdateCategory}
+                onBulkUpdatePrice={handleBulkUpdatePrice}
+                onBulkAdjustStock={handleBulkAdjustStock}
               />
             </div>
           </>

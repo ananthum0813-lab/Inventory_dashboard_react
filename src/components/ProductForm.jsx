@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 
-const empty = { name: '', category: '', quantity: '', price: '', lowStockThreshold: '10', description: '' }
+// ── Change this single value to update the default Low Stock Threshold app-wide ──
+const DEFAULT_LOW_STOCK_THRESHOLD = 10
+
+const empty = { name: '', category: '', quantity: '', price: '', lowStockThreshold: String(DEFAULT_LOW_STOCK_THRESHOLD), description: '' }
 
 function Field({ label, name, required, hint, errors, touched, children }) {
   return (
@@ -33,7 +36,7 @@ function ProductForm({ initialData, onSubmit, onCancel, categories = [] }) {
         category:          initialData.category          || '',
         quantity:          String(initialData.quantity   ?? ''),
         price:             String(initialData.price      ?? ''),
-        lowStockThreshold: String(initialData.lowStockThreshold ?? 10),
+        lowStockThreshold: String(initialData.lowStockThreshold ?? DEFAULT_LOW_STOCK_THRESHOLD),
         description:       initialData.description       || '',
       })
     } else {
@@ -322,7 +325,7 @@ function ProductForm({ initialData, onSubmit, onCancel, categories = [] }) {
                 type="text"
                 inputMode="numeric"
                 pattern="\d*"
-                placeholder="10"
+                placeholder={String(DEFAULT_LOW_STOCK_THRESHOLD)}
                 value={form.lowStockThreshold}
                 onChange={handleChange}
                 onBlur={handleBlur}
@@ -330,7 +333,9 @@ function ProductForm({ initialData, onSubmit, onCancel, categories = [] }) {
               />
               <button type="button" className="qty-btn" onClick={() => handleThresholdStep(1)} aria-label="Increase threshold">+</button>
             </div>
-            {!errors.lowStockThreshold && <p className="field-hint">Alert when qty falls at or below this</p>}
+            {!errors.lowStockThreshold && (
+              <p className="field-hint">Default low stock threshold value is {DEFAULT_LOW_STOCK_THRESHOLD}</p>
+            )}
           </Field>
 
         </div>

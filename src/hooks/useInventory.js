@@ -38,10 +38,9 @@ export function useInventory() {
     )
   }
 
-  // ── CRUD ─────────────────────────────────────────────────────────────────
+  // ── Single product CRUD ───────────────────────────────────────────────────
   function addProduct(product) {
     if (isDuplicate(product.name, product.category)) return false
-
     const quantity = Number(product.quantity)
     const newProduct = {
       ...product,
@@ -55,11 +54,9 @@ export function useInventory() {
   function editProduct(id, updates) {
     const target = products.find(p => p.id === id)
     if (!target) return
-
     const newName     = updates.name     !== undefined ? updates.name     : target.name
     const newCategory = updates.category !== undefined ? updates.category : target.category
     if (isDuplicate(newName, newCategory, id)) return false
-
     setProducts(prev =>
       prev.map(p => {
         if (p.id !== id) return p
@@ -103,8 +100,48 @@ export function useInventory() {
     const idSet = new Set(ids)
     setProducts(prev =>
       prev.map(p =>
-        idSet.has(p.id) ? { ...p, category: newCategory, updatedAt: new Date().toISOString() } : p
+        idSet.has(p.id)
+          ? { ...p, category: newCategory, updatedAt: new Date().toISOString() }
+          : p
       )
+    )
+  }
+
+  function bulkUpdatePrice(ids, newPrice) {
+    const idSet = new Set(ids)
+    const price = parseFloat(Number(newPrice).toFixed(2))
+    setProducts(prev =>
+      prev.map(p =>
+        idSet.has(p.id)
+          ? { ...p, price, updatedAt: new Date().toISOString() }
+          : p
+      )
+    )
+  }
+
+  // type: 'stock-in' | 'stock-out' | 'set'
+  // 'set'      → set every selected product's quantity to exactly `amount`
+  // 'stock-in' → add `amount` to every selected product's quantity
+  // 'stock-out'→ subtract `amount` from every selected product's quantity (floor 0)
+  function bulkAdjustStock(ids, amount, type) {
+    const idSet = new Set(ids)
+    const amt   = Number(amount)
+    setProducts(prev =>
+      prev.map(p => {
+        if (!idSet.has(p.id)) return p
+        const oldQty = Number(p.quantity)
+        let newQty
+        if (type === 'set')       newQty = Math.max(0, amt)
+        else if (type === 'stock-in')  newQty = oldQty + amt
+        else                           newQty = Math.max(0, oldQty - amt)
+        const action = type === 'set' ? 'edit' : type
+        return {
+          ...p,
+          quantity: newQty,
+          history: [...(p.history || []), makeHistoryEntry({ previousQty: oldQty, newQty, action })],
+          updatedAt: new Date().toISOString(),
+        }
+      })
     )
   }
 
@@ -113,5 +150,10 @@ export function useInventory() {
     setProducts(prev => prev.filter(p => !idSet.has(p.id)))
   }
 
-  return { products, addProduct, editProduct, deleteProduct, adjustStock, bulkUpdateCategory, bulkDelete }
+  return {
+    products,
+    addProduct, editProduct, deleteProduct,
+    adjustStock,
+    bulkUpdateCategory, bulkUpdatePrice, bulkAdjustStock, bulkDelete,
+  }
 }
